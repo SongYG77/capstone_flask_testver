@@ -9,7 +9,8 @@ def db_connector():
         user='',
         passwd='',
         db='capdb',
-        charset='utf8')
+        #charset='utf8'
+    )
     cursor = db.cursor()
     sql = '''SELECT * FROM capstone;'''
     cursor.execute(sql)
