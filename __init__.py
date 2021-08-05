@@ -1,12 +1,9 @@
-from model import db, User, Bench, Reck
+from model import db, User, Bench, Reck,Aerobic
 from flask import Flask, render_template, request, redirect , jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 import pymysql
 pymysql.install_as_MySQLdb()
-
-
-
 app = Flask(__name__)
 
 
@@ -32,6 +29,42 @@ def reserve():
         db.session.add(bench)
         db.session.commit()
         return 'OK'
+
+@app.route('/bench_reservation_user/<username>',methods=['GET','POST'])
+def benchreserve_user(username):
+    if request.method == 'GET' :
+
+        bench = []
+        benchdata = Bench.query.filter(Bench.name == username).all()
+        for i in benchdata:
+            a = {"datetime" :i.date+" "+i.time,
+                 "name": i.name}
+            bench.append(a)
+        return jsonify(bench)
+
+@app.route('/reck_reservation_user/<username>',methods=['GET','POST'])
+def reckreserve_user(username):
+    if request.method == 'GET' :
+        reck = []
+        reckdata = Reck.query.filter(Reck.name == username).all()
+        for i in reckdata:
+            a = {"datetime": i.date + " " + i.time,
+                 "name": i.name}
+            reck.append(a)
+
+        return jsonify(reck)
+
+@app.route('/aerobic_reservation_user/<username>',methods=['GET','POST'])
+def aerobicreserve_user(username):
+    if request.method == 'GET' :
+        aerobic = []
+        aerobicdata = Aerobic.query.filter(Aerobic.name == username).all()
+        for i in aerobicdata:
+            a = {"datetime": i.date + " " + i.time,
+                 "name": i.name}
+            aerobic.append(a)
+
+        return jsonify(aerobic)
 
 if __name__ == "__main__":
     migrate = Migrate()
