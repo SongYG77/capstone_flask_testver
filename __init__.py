@@ -2,6 +2,8 @@ from model import db, User, Bench, Reck
 from flask import Flask, render_template, request, redirect , jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
+import pymysql
+pymysql.install_as_MySQLdb()
 
 
 
@@ -18,8 +20,6 @@ def reserve():
             a = {"datetime" :i.date+" "+i.time,
                  "name": i.name}
             b.append(a)
-        print(a)
-        print(b)
         return jsonify(b)
     elif request.method == 'POST':
         params = request.get_json()
@@ -35,7 +35,7 @@ def reserve():
 
 if __name__ == "__main__":
     migrate = Migrate()
-    app.config['SQLALCHEMY_DATABASE_URI'] = ''
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql://root:thddbs00@localhost:3306/capstone'
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     db.init_app(app)
     db.app = app
