@@ -1,11 +1,32 @@
-from model import db, User, Bench, Reck,Aerobic
+from model import db, User, Bench, Reck,Aerobic,test_Table
 from flask import Flask, render_template, request, redirect , jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 import pymysql
+import schedule
+import datetime
+from apscheduler.schedulers.background import BackgroundScheduler
+
 pymysql.install_as_MySQLdb()
 app = Flask(__name__)
 
+#바뀐 작업 : 데베 스키마 변경 그래서 모델에서 start,end time 수정 aerobic 소문자로
+#아래 reservation_user 추가
+#스캐쥴 추가. apscheduler 사용
+#date 파트로 오늘 날짜보다 전일 예약이면 삭제하도록 만듬
+#그럴려면 데베 스키마를 date 파트 전부 date 형으로 변경해야함.
+#import time 이랑 datetime 추가.
+
+#background 방식으로 사용해야 start 이후 중지되지 않음
+sched = BackgroundScheduler()
+#지금은 테스트를 위해 매 분 갱신 이후에는('cron', hour='0', minute='10', id='update_db') 0시 10분에 갱신되도록 바꿀 예정
+@sched.scheduled_job('cron', second = '0', id='test')
+def test():
+    test_Table.query.filter(test_Table.date < datetime.date.today()).delete()
+    db.session.commit()
+
+#스캐쥴링 시작. 실행되고 있는 동안 스캐쥴에 의해 실행될 것.
+sched.start()
 
 @app.route('/reservation',methods=['GET','POST'])
 def reserve():
@@ -30,10 +51,49 @@ def reserve():
         db.session.commit()
         return 'OK'
 
+@app.route('/reservation_user/<username>',methods=['GET','POST'])
+def reservation_user(username):
+    if request.method == 'GET':
+
+        reservelist = []
+
+        benchdata = Bench.query.filter(Bench.name == username).all()
+        reckdata = Reck.query.filter(Reck.name == username).all()
+        aerobicdata = Aerobic.query.filter(Aerobic.name == username).all()
+
+        for i in benchdata:
+            temp = {
+                "equipment" : "bench",
+                "date": i.date,
+                "start_time" : i.start_time,
+                "end_time" : i.end_time,
+                 "name": i.name
+            }
+            reservelist.append(temp)
+        for i in reckdata:
+            temp = {
+                "equipment" : "reck",
+                "date": i.date,
+                "start_time" : i.start_time,
+                "end_time" : i.end_time,
+                 "name": i.name
+            }
+            reservelist.append(temp)
+        for i in aerobicdata:
+            temp = {
+                "equipment" : "aerobic",
+                "date": i.date,
+                "start_time" : i.start_time,
+                "end_time" : i.end_time,
+                 "name": i.name
+            }
+            reservelist.append(temp)
+
+        return jsonify(reservelist)
+
 @app.route('/bench_reservation_user/<username>',methods=['GET','POST'])
 def benchreserve_user(username):
     if request.method == 'GET' :
-
         bench = []
         benchdata = Bench.query.filter(Bench.name == username).all()
         for i in benchdata:
@@ -75,4 +135,4 @@ if __name__ == "__main__":
     db.create_all()
     migrate.init_app(app, db)
     app.run(debug = False, host = '0.0.0.0')
-#기구별로 나눠서 저장되게 바꾸기.
+
