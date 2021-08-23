@@ -5,11 +5,13 @@ from flask_migrate import Migrate
 import pymysql
 import schedule
 import datetime
-import date
 from apscheduler.schedulers.background import BackgroundScheduler
 
 pymysql.install_as_MySQLdb()
 app = Flask(__name__)
+
+#해야할일 : 예약을 할 때 시간이 겹치는지 아닌지 알고리즘 구현
+
 
 #바뀐 작업 : 데베 스키마 변경 그래서 모델에서 start,end time 수정 aerobic 소문자로
 #아래 reservation_user 추가
@@ -35,7 +37,7 @@ sched.start()
 
 #예약 정보를 받고 보내는 부분(기구별로 나눔)
 @app.route('/bench_reservation',methods=['GET','POST'])
-def reserve():
+def reserve_bench():
     if request.method == 'GET':
         b = []
         data = Bench.query.all()
@@ -64,7 +66,7 @@ def reserve():
 
 
 @app.route('/aerobic_reservation',methods=['GET','POST'])
-def reserve():
+def reserve_aerobic():
     if request.method == 'GET':
         b = []
         data = Aerobic.query.all()
@@ -91,7 +93,7 @@ def reserve():
         return 'OK'
 
 @app.route('/reck_reservation/<date>',methods=['GET','POST'])
-def reserve(date):
+def reserve_reck(date):
     if request.method == 'GET':
         b = []
         data = Reck.query.filter(Reck.date == date).all()
