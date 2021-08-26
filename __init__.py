@@ -87,7 +87,7 @@ def reserve_reck(date):
     if request.method == 'GET':
         start_lst = []
         end_lst = []
-
+        b = []
         data = Reck.query.filter(Reck.date == date).all()
         for i in data:
             start_lst.append(i.start_time)
@@ -100,18 +100,38 @@ def reserve_reck(date):
         return jsonify(b)
     elif request.method == 'POST':
         params = request.get_json()
-        id = params['id']
         userid = params['userid']
         date = params['date']
         start_time = params['start_time']
         end_time = params["end_time"]
 
+        temp = start_time.split(':')
+        res_start_time = int(temp[0])*100 + int(temp[1])
+        temp = end_time.split(':')
+        res_end_time = int(temp[0]) * 100 + int(temp[1])
+        return_data = 'OK'
         data = Reck.query.filter(Reck.date == date).all()
+        maxid = 0
+        for i in data :
+            temp = i.start_time.split(':')
+            data_stime = int(temp[0])*100 + int(temp[1])
+            temp = i.end_time.split(':')
+            data_etime = int(temp[0]) * 100 + int(temp[1])
 
-        reck = Reck(id, userid, date, start_time, end_time)
-        db.session.add(reck)
-        db.session.commit()
-        return 'OK'
+            if maxid<i.id : maxid = i.id
+            if res_start_time>=data_stime and res_start_time<=data_etime :
+                return_data = 'overlap'
+            elif res_end_time>=data_stime and res_end_time<=data_etime :
+                return_data = 'overlap'
+            elif res_start_time<=data_stime and data_stime<=res_end_time :
+                return_data = 'overlap'
+
+
+        if return_data == 'OK' :
+            reck = Reck(maxid+1, userid, date, start_time, end_time)
+            db.session.add(reck)
+            db.session.commit()
+        return return_data
 
 
 # 유저 마이페이지 부분, 사용자의 예약 정보를 불러옴.
