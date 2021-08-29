@@ -1,15 +1,22 @@
 from model import db, User, Bench, Reck, Aerobic
 from flask import Flask, render_template, request, redirect, jsonify
 from flask_sqlalchemy import SQLAlchemy
+
 from flask_migrate import Migrate
-import schedule
 import datetime
 from apscheduler.schedulers.background import BackgroundScheduler
+from flask_jwt_extended import *
 
 app = Flask(__name__)
 
 # background 방식으로 사용해야 start 이후 중지되지 않음
 sched = BackgroundScheduler()
+
+app.config.update(
+    DEBUG = True,
+    JWT_SECRET_KEY = 'example secret key'
+)
+jwt = JWTManager(app)
 
 
 # 지금은 테스트를 위해 매 분 갱신 이후에는('cron', hour='0', minute='10', id='update_db') 0시 10분에 갱신되도록 바꿀 예정
@@ -23,6 +30,27 @@ def update_db():
 
 # 스캐쥴링 시작. 실행되고 있는 동안 스캐쥴에 의해 실행될 것.
 sched.start()
+
+#로그인 구현중
+@app.route('/login', methods = ['GET', 'POST'])
+def login():
+    if request.method == 'POST' :
+        params = request.get_json()
+        userid = params['userid']
+        password = params['password']
+
+        data = User.query.filter((userid == User.id) & (password == User.password)).first()
+        if data != None :
+            resualt = {
+                "resualt" : 'OK',
+                "access_token" : create_access_token(identity=userid , expires_delta=False)
+            }
+            return jsonify(resualt)
+        else :
+            resualt = {
+                "resualt" : 'Fail'
+            }
+            return jsonify(resualt)
 
 
 # 예약 정보를 받고 보내는 부분(기구별로 나눔)
@@ -85,19 +113,24 @@ def reserve_aerobic():
 @app.route('/reck_reservation/<date>', methods=['GET', 'POST'])
 def reserve_reck(date):
     if request.method == 'GET':
-        start_lst = []
-        end_lst = []
-        b = []
+        start_lst_hour = []
+        start_lst_min = []
+        end_lst_hour = []
+        end_lst_min = []
         data = Reck.query.filter(Reck.date == date).all()
         for i in data:
-            start_lst.append(i.start_time)
-            end_lst.append(i.end_time)
+
+            start_lst_hour.append(i.start_time.split(':')[0])
+            start_lst_min.append(i.start_time.split(':')[1])
+            end_lst_hour.append(i.end_time.split(':')[0])
+            end_lst_min.append(i.end_time.split(':')[1])
         a = {
-            "start_time": start_lst,
-            "end_time": end_lst
+            "start_time_hour": start_lst_hour,
+            "start_time_min": start_lst_min,
+            "end_time_hour": end_lst_hour,
+            "end_time_min": end_lst_min
         }
-        b.append(a)
-        return jsonify(b)
+        return jsonify(a)
     elif request.method == 'POST':
         params = request.get_json()
         userid = params['userid']
@@ -125,7 +158,35 @@ def reserve_reck(date):
                 return_data = 'overlap'
             elif res_start_time<=data_stime and data_stime<=res_end_time :
                 return_data = 'overlap'
+            elif i.userid == userid :
+                return_data = "overlap_today"
 
+        benchdata = Bench.query.filter( Bench.date == date).filter(Bench.userid == userid).all()
+        aerobicdata = Aerobic.query.filter( Aerobic.date == date).filter(Aerobic.userid == userid).all()
+
+        for i in benchdata:
+            temp = i.start_time.split(':')
+            data_stime = int(temp[0]) * 100 + int(temp[1])
+            temp = i.end_time.split(':')
+            data_etime = int(temp[0]) * 100 + int(temp[1])
+            if res_start_time>=data_stime and res_start_time<=data_etime :
+                return_data = 'overlap_user'
+            elif res_end_time>=data_stime and res_end_time<=data_etime :
+                return_data = 'overlap_user'
+            elif res_start_time<=data_stime and data_stime<=res_end_time :
+                return_data = 'overlap_user'
+
+        for i in aerobicdata:
+            temp = i.start_time.split(':')
+            data_stime = int(temp[0]) * 100 + int(temp[1])
+            temp = i.end_time.split(':')
+            data_etime = int(temp[0]) * 100 + int(temp[1])
+            if res_start_time>=data_stime and res_start_time<=data_etime :
+                return_data = 'overlap_user'
+            elif res_end_time>=data_stime and res_end_time<=data_etime :
+                return_data = 'overlap_user'
+            elif res_start_time<=data_stime and data_stime<=res_end_time :
+                return_data = 'overlap_user'
 
         if return_data == 'OK' :
             reck = Reck(maxid+1, userid, date, start_time, end_time)
@@ -147,7 +208,7 @@ def reservation_user(userid):
 
         for i in benchdata:
             temp = {
-                "equipment": "bench",
+                "equipment": "벤치",
                 "date": i.date,
                 "start_time": i.start_time,
                 "end_time": i.end_time,
@@ -156,7 +217,7 @@ def reservation_user(userid):
             reservelist.append(temp)
         for i in reckdata:
             temp = {
-                "equipment": "reck",
+                "equipment": "파워 렉",
                 "date": i.date,
                 "start_time": i.start_time,
                 "end_time": i.end_time,
@@ -165,7 +226,7 @@ def reservation_user(userid):
             reservelist.append(temp)
         for i in aerobicdata:
             temp = {
-                "equipment": "aerobic",
+                "equipment": "유산소",
                 "date": i.date,
                 "start_time": i.start_time,
                 "end_time": i.end_time,
@@ -227,9 +288,12 @@ def getUserData(userid):
         return jsonify(temp)
 
 
+
+
 if __name__ == "__main__":
     migrate = Migrate()
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql://root:thddbs00@localhost:3306/capstone'
+    #mysql://root:thddbs00@localhost:3306/capstone
+    app.config['SQLALCHEMY_DATABASE_URI'] = ''
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     db.init_app(app)
     db.app = app
