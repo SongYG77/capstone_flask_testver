@@ -1,11 +1,12 @@
-from model import db, User, Bench, Reck, Aerobic
-from flask import Flask, render_template, request, redirect, jsonify
+from model import db, User, Bench, Reck, Aerobic, Ptclass
+from flask import Flask, render_template, request, redirect, jsonify,Response, make_response
 from flask_sqlalchemy import SQLAlchemy
-
 from flask_migrate import Migrate
-import datetime
+import schedule
 from apscheduler.schedulers.background import BackgroundScheduler
 from flask_jwt_extended import *
+import json
+from datetime import datetime
 
 app = Flask(__name__)
 
@@ -280,14 +281,103 @@ def aerobicreserve_user(userid):
 def getUserData(userid):
     if request.method == 'GET':
         data = User.query.filter(User.id == userid).all()
-        temp = []
+        temp={}
         for i in data:
             a = {'userid': i.id, 'user_name': i.name, 'start_date': i.start_date, 'end_date': i.end_date,
                  'enrollment': i.enrollment}
-            temp.append(a)
-        return jsonify(temp)
+            temp=a
+        return jsonify(a)
 
+@app.route('/delete/<userid>',methods=['DELETE'])
+def delReservation(userid):
+    if request.method == 'DELETE':
+        name = request.args.get('name')
+        date = request.args.get('date')
+        reck_user_id = []
+        aerobic_user_id = []
+        bench_user_id = []
+        reck_date =[]
+        aerobic_date = []
+        bench_date = []
+        for i in Reck.query.all():
+            reck_user_id.append(i.userid)
+            reck_date.append(i.date)
+        for i in Aerobic.query.all():
+            aerobic_user_id.append(i.userid)
+            aerobic_date.append(i.date)
+        for i in Bench.query.all():
+            bench_user_id.append(i.userid)
+            bench_date.append(i.date)
 
+        if name == '파워 렉':
+            if userid in reck_user_id and date in reck_date:
+                Reck.query.filter((Reck.userid == userid)&(Reck.date == date)).delete()
+                db.session.commit()
+                return "Reck Delete success"
+            else:
+                response = Response(status=404)
+                return response
+
+        elif name == '유산소':
+            if userid in aerobic_user_id and date in aerobic_date:
+                Aerobic.query.filter(Aerobic.userid == userid).delete()
+                db.session.commit()
+                return "Aerobic Delete success"
+            else:
+                response = Response(status=404)
+                return response
+
+        elif name == '벤치':
+            if userid in bench_user_id and date in bench_date:
+                Bench.query.filter(Bench.userid == userid).delete()
+                db.session.commit()
+                return "Bench Delete success"
+            else:
+                response = Response(status=404)
+                return response
+
+@app.route('/pt/<userid>',methods=['GET','POST'])
+def pt(userid):
+    if request.method == 'POST':
+        classinfo = request.form['classinfo']
+        date = request.form['date']
+        user_id = []
+        for i in Reck.query.all():
+            user_id.append(i.userid)
+
+        if userid in user_id:
+            ptclass = Ptclass(id, userid, date, classinfo)
+            db.session.add(ptclass)
+            db.session.commit()
+            return "OK"
+        else :
+            return 'Fail'
+    elif request.method == 'GET':
+        date = []
+        classinfo =[]
+        starttime =[]
+        li = []
+        todaydate = datetime.today().strftime("%Y-%m-%d")
+        a = Ptclass.query.filter((Ptclass.userid == userid)&(Ptclass.date >= todaydate)).order_by('date').all()
+
+        for i in a:
+            date.append(i.date)
+            classinfo.append(i.classinfo)
+            starttime.append(i.starttime)
+
+        for i in range(len(date)):
+            dictionary = {'시간' : date[i], '수업 내용' : classinfo[i], '시작 시간': starttime[i]}
+            li.append(dictionary)
+
+        pt = {
+            'id' : userid,
+            'history' : li
+        }
+
+        pt_json = json.dumps(pt, ensure_ascii=False)
+        res = make_response(pt_json)
+
+        return res
 
 
 if __name__ == "__main__":

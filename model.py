@@ -72,6 +72,21 @@ class Aerobic(db.Model):
         self.start_time = start_time
         self.end_time = end_time
 
+class Ptclass(db.Model):
+    __tablename__ = "Ptclass"
+    id = db.Column(db.Integer, primary_key=True,unique=True,autoincrement=True)
+    userid = db.Column(db.String(32))
+    date = db.Column(db.String(32))
+    classinfo = db.Column(db.String(200))
+    starttime = db.Column(db.String(32))
+
+    def __init__(self, id, userid, date, classinfo, starttime):
+        self.id = id
+        self.userid = userid
+        self.date = date
+        self.classinfo = classinfo
+        self.starttime = starttime
+
 
 
 
